@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>BankEdge Gurugram - AI Center Manager</title>
+  
+  <meta name="theme-color" content="#1e3a8a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bankedge: {
+              50: '#eff6ff',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              800: '#1e40af',
+              900: '#1e3a8a',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased select-none">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    function App() {
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [apiKey, setApiKey] = useState(() => localStorage.getItem('be_gemini_key') || '');
+      const [showSettings, setShowSettings] = useState(false);
+      
+      const [students, setStudents] = useState(() => {
+        const saved = localStorage.getItem('be_students');
+        return saved ? JSON.parse(saved) : [
+          { id: 0, name: "Aman Verma", degree: "B.Com Fresher (2026)", phone: "+919871234510", status: "Hot Lead", bankTarget: "ICICI / HDFC Officer", notes: "Prefers morning batch" },
+          { id: 1, name: "Sneha Rao", degree: "BBA Finance (2025)", phone: "+919811488219", status: "Walk-in Booked", bankTarget: "Axis Bank Deputy Mgr", notes: "Coming with father" },
+          { id: 2, name: "Vikram Chauhan", degree: "BA Graduate (2026)", phone: "+919953100293", status: "Follow-up", bankTarget: "Kotak Mahindra RM", notes: "Needs fee installment option" }
+        ];
+      });
+      const [selectedStudentIdx, setSelectedStudentIdx] = useState(0);
+
+      const [chats, setChats] = useState(() => {
+        const saved = localStorage.getItem('be_chats');
+        return saved ? JSON.parse(saved) : {
+          0: [
+            { id: 1, sender: 'lead', text: "Hello, I completed my B.Com. Do you offer guaranteed placement in Gurugram private banks?", time: '10:14 AM' },
+            { id: 2, sender: 'bot', text: "Namaste! Yes, BankEdge Gurugram provides our 30-Day PROBE Banking Certification with direct interview drives at HDFC, ICICI, and Axis Bank. Are you under 27?", time: '10:15 AM' },
+            { id: 3, sender: 'lead', text: "Yes, I am 22. Can I visit your Spanish Court center today?", time: '10:17 AM' }
+          ]
+        };
+      });
+      const [replyDraft, setReplyDraft] = useState('');
+      const [isAiReplying, setIsAiReplying] = useState(false);
+
+      const [postTopic, setPostTopic] = useState('batch');
+      const [customPrompt, setCustomPrompt] = useState('');
+      const [generatedPost, setGeneratedPost] = useState('');
+      const [isGeneratingPost, setIsGeneratingPost] = useState(false);
+      const [postPublished, setPostPublished] = useState(false);
+
+      const [dailyBudget, setDailyBudget] = useState(500);
+      const [adCopy, setAdCopy] = useState("Unemployed after B.Com / BBA in Gurugram? Start your private banking career with guaranteed placement support in 30 days. Speak directly to senior banking mentors.");
+      const [isGeneratingAd, setIsGeneratingAd] = useState(false);
+
+      useEffect(() => {
+        localStorage.setItem('be_students', JSON.stringify(students));
+      }, [students]);
+
+      useEffect(() => {
+        localStorage.setItem('be_chats', JSON.stringify(chats));
+      }, [chats]);
+
+      const saveKey = (val) => {
+        setApiKey(val);
+        localStorage.setItem('be_gemini_key', val);
+      };
+
+      const callRealAI = async (prompt, systemInstruction) => {
+        if (!apiKey) {
+          return new Promise((res) => {
+            setTimeout(() => {
+              if (prompt.includes('WhatsApp')) {
+                res("Yes, absolutely! We are available today at Office No. FF9, Spanish Court, Near Krishna Chowk, Sector 2, Palam Vihar. Please visit before 6 PM for your eligibility evaluation with our Senior Banking Counselor.");
+              } else if (prompt.includes('Instagram')) {
+                res("🔥 Graduate in Gurugram? Turn your B.Com/BBA into an Assistant Manager role at HDFC or ICICI Bank in just 30 days!\n\n✅ 100% Placement Drives\n✅ Core Banking & Finacle Training\n\n📍 Spanish Court, Palam Vihar. Tap below to chat with admissions!");
+              } else {
+                res("🚀 [ADMISSIONS OPEN] 30-Day Banking Career Accelerator at BankEdge Gurugram!\n\nGraduates (B.Com / BBA / BA): Get hired in leading private banks (HDFC, ICICI, Axis) with our placement-guaranteed PROBE program.\n\n📍 Walk-in Center: Office No. FF9, Spanish Court, Near Krishna Chowk, Palam Vihar, Sector 2, Gurugram.\n📞 Call/WhatsApp: +91 98188 45902");
+              }
+            }, 700);
+          });
+        }
+
+        try {
+          const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+          const res = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{
+                parts: [{ text: `${systemInstruction}\n\nTask: ${prompt}` }]
+              }]
+            })
+          });
+          const data = await res.json();
+          return data?.candidates?.[0]?.content?.parts?.[0]?.text || "Unable to generate content. Please check API key.";
+        } catch (err) {
+          return "API Connection Error: Check network connection and API key.";
+        }
+      };
+
+      const handleGenerateGBPPost = async () => {
+        setIsGeneratingPost(true);
+        setPostPublished(false);
+        const sys = "You are the head of marketing for BankEdge Academy, Gurugram Center (Office No. FF9, Spanish Court, Near Krishna Chowk, Palam Vihar, Sector 2, Gurugram. Phone: +91 98188 45902). Write high-ranking, local-SEO-optimized Google Business Profile posts with clear calls-to-action.";
+        const prompt = `Write a Google Business Profile update post about: ${postTopic === 'batch' ? 'New 30-day banking job training batch for B.Com/BBA freshers' : 'Placement celebration of students hired by HDFC & ICICI banks'}. Extra notes: ${customPrompt}`;
+        const output = await callRealAI(prompt, sys);
+        setGeneratedPost(output);
+        setIsGeneratingPost(false);
+      };
+
+      const handleGenerateAiReply = async () => {
+        setIsAiReplying(true);
+        const curChat = chats[selectedStudentIdx] || [];
+        const lastMsg = curChat[curChat.length - 1]?.text || "Inquiry about banking course";
+        const student = students[selectedStudentIdx];
+
+        const sys = `You are the admissions counselor at BankEdge Gurugram (Office No. FF9, Spanish Court, Near Krishna Chowk, Palam Vihar, Sector 2, Gurugram. Phone: +91 98188 45902).
+        Be professional, reassuring, and concise. Convince the graduate to visit the Spanish Court center for a counseling session. Mention eligibility (< 27 years, 50%+ in graduation) and private bank placements (HDFC, ICICI, Axis).`;
+        const prompt = `Student Name: ${student.name}, Degree: ${student.degree}, Target Bank: ${student.bankTarget}. Student's last message: "${lastMsg}". Write a concise WhatsApp reply under 50 words.`;
+
+        const output = await callRealAI(prompt, sys);
+        setReplyDraft(output.replace(/^"|"$/g, ''));
+        setIsAiReplying(false);
+      };
+
+      const sendViaActualWhatsApp = (phone, text) => {
+        const cleanPhone = phone.replace(/[^0-9]/g, '');
+        const encodedText = encodeURIComponent(text);
+        window.open(`https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodedText}`, '_system');
+      };
+
+      const sendInAppMessage = () => {
+        if (!replyDraft.trim()) return;
+        const curList = chats[selectedStudentIdx] || [];
+        const updated = [...curList, {
+          id: Date.now(),
+          sender: 'bot',
+          text: replyDraft,
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        }];
+        setChats(prev => ({ ...prev, [selectedStudentIdx]: updated }));
+        setReplyDraft('');
+      };
+
+      const handleGenerateAdCopy = async () => {
+        setIsGeneratingAd(true);
+        const sys = "You are an elite Meta Ads media buyer for BankEdge Gurugram. Write compelling Click-to-WhatsApp Instagram ad primary text targeting unemployed fresh graduates (B.Com/BBA) in Gurugram, Sector 14, Palam Vihar, and Kapashera.";
+        const prompt = "Write an Instagram sponsored ad copy that drives graduates to WhatsApp for free banking job counseling.";
+        const out = await callRealAI(prompt, sys);
+        setAdCopy(out);
+        setIsGeneratingAd(false);
+      };
+
+      const currentStudent = students[selectedStudentIdx] || students[0];
+      const activeChatList = chats[selectedStudentIdx] || [];
+
+      return (
+        <div className="max-w-md mx-auto min-h-screen bg-slate-50 flex flex-col shadow-2xl relative pb-20 select-text">
+          <header className="bg-bankedge-900 text-white px-4 pt-4 pb-3 sticky top-0 z-40 shadow-md">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-lg tracking-tight">BankEdge AI</span>
+                  <span className="bg-amber-400 text-bankedge-900 text-[10px] font-black px-1.5 py-0.5 rounded">GURUGRAM</span>
+                </div>
+                <p className="text-xs text-blue-200">Office No. FF9, Spanish Court, Palam Vihar</p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setShowSettings(true)}
+                  className="bg-blue-950/80 border border-blue-700/60 text-blue-200 px-2 py-1 rounded-lg text-xs"
+                >
+                  ⚙️ {apiKey ? 'API Set' : 'Add API Key'}
+                </button>
+              </div>
+            </div>
+          </header>
+
+          {showSettings && (
+            <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl p-5 w-full max-w-sm space-y-3">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold text-slate-900 text-sm">AI Engine Settings</h3>
+                  <button onClick={() => setShowSettings(false)} className="text-slate-400 text-lg font-bold">✕</button>
+                </div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  Enter your Google Gemini API key to enable live AI responses. The key is saved locally in your phone's secure storage.
+                </p>
+                <input 
+                  type="password"
+                  placeholder="Paste Gemini API Key (AIzaSy...)"
+                  value={apiKey}
+                  onChange={(e) => saveKey(e.target.value)}
+                  className="w-full text-xs p-2.5 border border-slate-300 rounded-xl outline-none focus:border-bankedge-700"
+                />
+                <button 
+                  onClick={() => setShowSettings(false)}
+                  className="w-full bg-bankedge-800 text-white font-bold py-2 rounded-xl text-xs"
+                >
+                  Save & Return
+                </button>
+              </div>
+            </div>
+          )}
+
+          <main className="flex-1 p-4 space-y-4">
+            {activeTab === 'dashboard' && (
+              <div className="space-y-4">
+                <div className="bg-gradient-to-r from-bankedge-800 to-bankedge-600 rounded-2xl p-4 text-white shadow-sm">
+                  <div className="flex justify-between items-start mb-1">
+                    <div>
+                      <p className="text-xs text-blue-200 uppercase font-medium">Center Operations</p>
+                      <h2 className="text-xl font-bold">Spanish Court Center</h2>
+                    </div>
+                    <span className="bg-emerald-500/20 text-emerald-300 text-xs px-2 py-0.5 rounded-full border border-emerald-400/30 font-semibold">
+                      Live
+                    </span>
+                  </div>
+                  <p className="text-xs text-blue-100">Near Krishna Chowk, Sector 2, Palam Vihar</p>
+
+                  <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-blue-400/30 text-center">
+                    <div>
+                      <div className="text-lg font-bold">{students.length}</div>
+                      <div className="text-[10px] text-blue-200">Active Leads</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold">#1</div>
+                      <div className="text-[10px] text-blue-200">Palam Vihar Rank</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold">₹{dailyBudget}</div>
+                      <div className="text-[10px] text-blue-200">Ad Budget/Day</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <a 
+                    href="https://maps.google.com/?q=Spanish+Court+Palam+Vihar+Gurugram" 
+                    target="_blank"
+                    className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 text-slate-800 font-semibold"
+                  >
+                    <span>📍</span> Open in Google Maps
+                  </a>
+                  <a 
+                    href="tel:+919818845902"
+                    className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm flex items-center gap-2 text-slate-800 font-semibold"
+                  >
+                    <span>📞</span> Call Center Desk
+                  </a>
+                </div>
+
+                <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-bold text-sm text-slate-900">Recent Student Leads</h3>
+                    <button onClick={() => setActiveTab('whatsapp')} className="text-xs text-bankedge-700 font-semibold">View All ➔</button>
+                  </div>
+                  <div className="space-y-2">
+                    {students.map((st, idx) => (
+                      <div 
+                        key={st.id} 
+                        onClick={() => { setSelectedStudentIdx(idx); setActiveTab('whatsapp'); }}
+                        className="p-2.5 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-center active:bg-slate-100"
+                      >
+                        <div>
+                          <div className="font-bold text-xs text-slate-900">{st.name}</div>
+                          <div className="text-[10px] text-slate-500">{st.degree} • {st.bankTarget}</div>
+                        </div>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                          {st.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'gbp' && (
+              <div className="space-y-4">
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                  <h3 className="font-bold text-sm text-slate-900">AI Google Business Profile Post</h3>
+                  <p className="text-xs text-slate-500">Auto-generate local posts loaded with Gurugram keywords to dominate Google 3-Pack rankings.</p>
+
+                  <div className="flex gap-2 text-xs">
+                    <button 
+                      onClick={() => setPostTopic('batch')} 
+                      className={`flex-1 py-1.5 rounded-lg border font-semibold ${postTopic === 'batch' ? 'bg-bankedge-800 text-white border-bankedge-800' : 'bg-slate-50 text-slate-700'}`}
+                    >
+                      New Batch Intake
+                    </button>
+                    <button 
+                      onClick={() => setPostTopic('placement')} 
+                      className={`flex-1 py-1.5 rounded-lg border font-semibold ${postTopic === 'placement' ? 'bg-bankedge-800 text-white border-bankedge-800' : 'bg-slate-50 text-slate-700'}`}
+                    >
+                      Placements
+                    </button>
+                  </div>
+
+                  <input 
+                    type="text"
+                    placeholder="Specific detail (e.g. 15 seats left, ICICI placements)..."
+                    value={customPrompt}
+                    onChange={(e) => setCustomPrompt(e.target.value)}
+                    className="w-full text-xs p-2 border border-slate-200 rounded-xl outline-none"
+                  />
+
+                  <button 
+                    onClick={handleGenerateGBPPost}
+                    disabled={isGeneratingPost}
+                    className="w-full bg-bankedge-700 text-white py-2 rounded-xl font-bold text-xs shadow hover:bg-bankedge-800"
+                  >
+                    {isGeneratingPost ? 'Generating with AI...' : 'Generate Optimized GBP Post'}
+                  </button>
+
+                  {generatedPost && (
+                    <div className="pt-2 space-y-2">
+                      <textarea 
+                        rows="6"
+                        value={generatedPost}
+                        onChange={(e) => setGeneratedPost(e.target.value)}
+                        className="w-full text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-200 leading-relaxed font-sans"
+                      />
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(generatedPost);
+                            setPostPublished(true);
+                          }}
+                          className={`flex-1 py-2 rounded-xl text-xs font-bold transition ${postPublished ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white'}`}
+                        >
+                          {postPublished ? '✓ Copied to Clipboard!' : 'Copy Post Text'}
+                        </button>
+                        <a 
+                          href="https://business.google.com" 
+                          target="_blank"
+                          className="px-3 py-2 bg-blue-50 border border-blue-200 text-bankedge-800 rounded-xl text-xs font-bold flex items-center justify-center"
+                        >
+                          Open GBP ➔
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'whatsapp' && (
+              <div className="space-y-3">
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {students.map((st, idx) => (
+                    <button
+                      key={st.id}
+                      onClick={() => setSelectedStudentIdx(idx)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap border shrink-0 ${
+                        selectedStudentIdx === idx ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {st.name}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-sm text-xs flex justify-between items-center">
+                  <div>
+                    <h4 className="font-bold text-slate-900">{currentStudent.name}</h4>
+                    <p className="text-slate-500">{currentStudent.degree} • {currentStudent.phone}</p>
+                    <p className="text-emerald-700 font-semibold">Goal: {currentStudent.bankTarget}</p>
+                  </div>
+                  <a 
+                    href={`tel:${currentStudent.phone}`}
+                    className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-1.5 rounded-lg font-bold"
+                  >
+                    Call
+                  </a>
+                </div>
+
+                <div className="bg-slate-100 rounded-2xl border border-slate-200 p-3 flex flex-col h-72">
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-1 text-xs">
+                    {activeChatList.map((m) => (
+                      <div 
+                        key={m.id} 
+                        className={`max-w-[85%] p-2.5 rounded-2xl ${
+                          m.sender === 'bot' 
+                            ? 'bg-emerald-600 text-white ml-auto rounded-tr-none' 
+                            : 'bg-white text-slate-800 shadow-sm mr-auto rounded-tl-none border border-slate-200'
+                        }`}
+                      >
+                        <p>{m.text}</p>
+                        <div className={`text-[9px] mt-1 text-right ${m.sender === 'bot' ? 'text-emerald-100' : 'text-slate-400'}`}>
+                          {m.time}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pt-2 flex gap-1.5">
+                    <button 
+                      onClick={handleGenerateAiReply}
+                      disabled={isAiReplying}
+                      className="bg-blue-100 text-bankedge-800 text-[10px] font-bold px-2.5 py-1 rounded-lg border border-blue-200"
+                    >
+                      {isAiReplying ? 'AI Generating...' : '✨ Generate AI Reply'}
+                    </button>
+                    <button 
+                      onClick={() => setReplyDraft("Yes, please visit our Spanish Court center (Office FF9, Near Krishna Chowk, Palam Vihar). We can evaluate your banking profile today.")}
+                      className="bg-slate-200 text-slate-700 text-[10px] font-medium px-2 py-1 rounded-lg"
+                    >
+                      📍 Location Template
+                    </button>
+                  </div>
+
+                  <div className="flex gap-1.5 pt-2">
+                    <input 
+                      type="text"
+                      placeholder="Type counselor reply..."
+                      value={replyDraft}
+                      onChange={(e) => setReplyDraft(e.target.value)}
+                      className="flex-1 text-xs bg-white border border-slate-300 rounded-xl px-3 py-2 outline-none focus:border-emerald-600"
+                    />
+                    <button 
+                      onClick={sendInAppMessage}
+                      className="bg-slate-800 text-white px-3 py-2 rounded-xl font-bold text-xs"
+                    >
+                      Add
+                    </button>
+                    <button 
+                      onClick={() => sendViaActualWhatsApp(currentStudent.phone, replyDraft || "Namaste from BankEdge Gurugram.")}
+                      className="bg-emerald-600 text-white px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1"
+                    >
+                      <span>WA</span> ➔
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'ads' && (
+              <div className="space-y-4">
+                <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3 text-xs">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-bold text-sm text-slate-900">Instagram & Meta Ads</h3>
+                    <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">Target: 12km Radius</span>
+                  </div>
+
+                  <div>
+                    <label className="font-semibold text-slate-700 block mb-1">Daily Budget (₹ INR): ₹{dailyBudget}</label>
+                    <input 
+                      type="range"
+                      min="200"
+                      max="2000"
+                      step="50"
+                      value={dailyBudget}
+                      onChange={(e) => setDailyBudget(Number(e.target.value))}
+                      className="w-full accent-bankedge-700"
+                    />
+                    <div className="flex justify-between text-[10px] text-slate-400">
+                      <span>₹200/day</span>
+                      <span>Estimated Leads: {Math.round(dailyBudget / 115)}/day</span>
+                      <span>₹2,000/day</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-purple-700 to-pink-600 p-3.5 rounded-xl text-white space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center font-bold text-[10px]">BE</div>
+                      <div>
+                        <div className="font-bold text-xs">bankedge_gurugram</div>
+                        <div className="text-[9px] text-pink-100">Sponsored • Palam Vihar, Gurugram</div>
+                      </div>
+                    </div>
+                    <p className="text-xs font-normal leading-relaxed">{adCopy}</p>
+                    <div className="bg-emerald-500 text-white font-bold py-1.5 text-center rounded-lg text-xs shadow">
+                      Chat on WhatsApp
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={handleGenerateAdCopy}
+                    disabled={isGeneratingAd}
+                    className="w-full bg-bankedge-800 text-white font-bold py-2 rounded-xl text-xs hover:bg-bankedge-900 transition"
+                  >
+                    {isGeneratingAd ? 'Writing New AI Ad...' : 'Generate Fresh High-CTR Ad Copy'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </main>
+
+          <nav className="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white border-t border-slate-200 px-3 py-2 flex justify-around items-center z-50">
+            <button 
+              onClick={() => setActiveTab('dashboard')} 
+              className={`flex flex-col items-center gap-0.5 ${activeTab === 'dashboard' ? 'text-bankedge-800 font-bold' : 'text-slate-400'}`}
+            >
+              <span className="text-base">📊</span>
+              <span className="text-[10px]">Dashboard</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('gbp')} 
+              className={`flex flex-col items-center gap-0.5 ${activeTab === 'gbp' ? 'text-bankedge-800 font-bold' : 'text-slate-400'}`}
+            >
+              <span className="text-base">📍</span>
+              <span className="text-[10px]">GBP Maps</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('whatsapp')} 
+              className={`flex flex-col items-center gap-0.5 ${activeTab === 'whatsapp' ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}
+            >
+              <span className="text-base">💬</span>
+              <span className="text-[10px]">WhatsApp</span>
+            </button>
+            <button 
+              onClick={() => setActiveTab('ads')} 
+              className={`flex flex-col items-center gap-0.5 ${activeTab === 'ads' ? 'text-bankedge-800 font-bold' : 'text-slate-400'}`}
+            >
+              <span className="text-base">📢</span>
+              <span className="text-[10px]">Insta Ads</span>
+            </button>
+          </nav>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
